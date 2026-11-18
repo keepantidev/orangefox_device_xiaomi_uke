@@ -24,7 +24,7 @@ for kind in recovery vold; do
     bash "$component/scripts/prepare-reviewed-patches.sh" "$path" apply "$kind"
     bash "$component/scripts/prepare-reviewed-patches.sh" "$path" check "$kind"
 done
-fetch external/sqlite https://android.googlesource.com/platform/external/sqlite 28e3f5878182658a5c34d3ce0859e950f2885aba
+fetch external/sqlite https://gitlab.com/OrangeFox/external/sqlite.git 28e3f5878182658a5c34d3ce0859e950f2885aba
 fetch prebuilts/clang/host/linux-x86 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 2d4dcbff7cb42f360f368bacf51cfe711fd1cb0f
 compiler="$tree/prebuilts/clang/host/linux-x86/clang-r547379/bin/clang++"
 [[ $(sha256sum "$compiler" | cut -d' ' -f1) == 55d80d777d85327543868817fb836231691eae2e13030ab31a01a769a820bf2f ]]
