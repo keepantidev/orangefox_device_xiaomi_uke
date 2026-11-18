@@ -11,7 +11,8 @@
 @@ -143,10 +144,10 @@
  	bool Is_Mounted();                                                        // Checks mount to see if the partition is currently mounted
  	bool Is_File_System_Writable();                                           // Checks if the root directory of the file system can be written to
- 	bool Mount(bool Display_Error);                                           // Mounts the partition if it is not mounted
+-	bool Mount(bool Display_Error);                                           // Mounts the partition if it is not mounted
++	bool Mount(bool Display_Error, const ure::LegacyLifecycleGuard* parent = nullptr);
 -	bool UnMount(bool Display_Error, int flags = 0);                          // Unmounts the partition if it is mounted
 +	bool UnMount(bool Display_Error, int flags = 0, const ure::LegacyLifecycleGuard* parent = nullptr); // Retains lifecycle exclusion through unmount
  	bool ReMount(bool Display_Error);                                         // Remounts the partition
@@ -40,11 +41,18 @@
  
  #include <stdio.h>
  #include <stdlib.h>
+@@ -1640,5 +1641,5 @@
+-bool TWPartition::Mount(bool Display_Error) {
++bool TWPartition::Mount(bool Display_Error, const ure::LegacyLifecycleGuard* parent) {
+     if (!Mount_Read_Only && !ure_legacy_write_guard(ure::LegacyWrite::WritableMount)) return false;
+ 	int exfat_mounted = 0;
+ 	unsigned int flags = Mount_Flags;
+ 	string mount_fs = "";
 @@ -1656,6 +1657,8 @@
  		return false;
  	}
  
-+	ure::LegacyLifecycleGuard lifecycle("mount");
++	ure::LegacyLifecycleGuard lifecycle("mount", parent);
 +	if (!ure_legacy_lifecycle_guard(lifecycle)) return false;
  
  	Find_Actual_Block_Device();

@@ -380,18 +380,19 @@ diff --git a/KeystoreInfo.cpp b/KeystoreInfo.cpp
 index a74a713..42e1f79 100755
 --- a/KeystoreInfo.cpp
 +++ b/KeystoreInfo.cpp
-@@ -28,6 +28,10 @@
+@@ -28,6 +28,11 @@
  #include <string>
  #include <sqlite3.h>
  #include "KeystoreInfo.hpp"
 +#ifdef __ANDROID_RECOVERY__
++#include <charconv>
 +#include <chrono>
 +#include <sys/statvfs.h>
 +#endif
  
  std::string KeystoreInfo::uint2hex(int64_t num) {
  	uint64_t temp = num;
-@@ -45,6 +49,37 @@ std::string KeystoreInfo::uint2hex(int64_t num) {
+@@ -45,6 +50,47 @@ std::string KeystoreInfo::uint2hex(int64_t num) {
  }
  
  std::string KeystoreInfo::getHandle(const userid_t user_id) {
@@ -419,8 +420,18 @@ index a74a713..42e1f79 100755
 +			-1, &statement, nullptr) == SQLITE_OK &&
 +		sqlite3_bind_int64(statement, 1, user_id) == SQLITE_OK &&
 +		sqlite3_step(statement) == SQLITE_ROW) {
-+		const auto value = sqlite3_column_int64(statement, 0);
-+		if (sqlite3_step(statement) == SQLITE_DONE) result = uint2hex(value);
++		const int type = sqlite3_column_type(statement, 0);
++		if (type == SQLITE_INTEGER || type == SQLITE_TEXT) {
++			const auto* text = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
++			const int size = sqlite3_column_bytes(statement, 0);
++			int64_t value = 0;
++			if (text && size > 0 && size <= 20) {
++				const auto parsed = std::from_chars(text, text + size, value);
++				if (parsed.ec == std::errc{} && parsed.ptr == text + size &&
++					std::to_string(value) == std::string(text, size) &&
++					sqlite3_step(statement) == SQLITE_DONE) result = uint2hex(value);
++			}
++		}
 +	}
 +	if (statement) sqlite3_finalize(statement);
 +	if (db && sqlite3_close(db) != SQLITE_OK) result.clear();
@@ -429,7 +440,7 @@ index a74a713..42e1f79 100755
  	int rc = 0;
  	sqlite3 *db;
  	sqlite3_stmt *stmt;
-@@ -72,6 +107,7 @@ std::string KeystoreInfo::getHandle(const userid_t user_id) {
+@@ -72,6 +118,7 @@ std::string KeystoreInfo::getHandle(const userid_t user_id) {
  	sqlite3_finalize(stmt);
  	sqlite3_close(db);
  	return uint2hex(value);

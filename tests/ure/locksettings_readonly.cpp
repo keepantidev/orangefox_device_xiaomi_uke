@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <cassert>
+#include <charconv>
 #include <chrono>
 #include <string>
 #include <sqlite3.h>
@@ -38,6 +39,16 @@ int main(int argc,char** argv) {
     assert(reader.getHandle(0).empty());
     readonly=false; assert(reader.getHandle(0).empty()); readonly=true;
     assert(reader.getHandle(10000).empty());
+    sql("DROP TABLE locksettings; CREATE TABLE locksettings(name TEXT,user INTEGER,value TEXT); INSERT INTO locksettings VALUES('sp-handle',0,'-9223372036854775808');");
+    assert(reader.getHandle(0)=="-9223372036854775808");
+    sql("UPDATE locksettings SET value='9223372036854775807';");
+    assert(reader.getHandle(0)=="9223372036854775807");
+    for (const char* value : {"NULL", "'garbage'", "'1.5'", "'9223372036854775808'",
+                              "'-9223372036854775809'", "''", "' 123'", "'123x'",
+                              "'+123'", "'0123'", "'-0'", "X'313233'", "'123'||char(0)||'4'"}) {
+        sql((std::string("UPDATE locksettings SET value=")+value+";").c_str());
+        assert(reader.getHandle(0).empty());
+    }
     sql("DROP TABLE locksettings; CREATE VIEW locksettings AS WITH RECURSIVE r(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM r WHERE x<100000000) SELECT 'sp-handle' AS name,0 AS user,max(x) AS value FROM r;");
     const auto began=std::chrono::steady_clock::now();
     assert(reader.getHandle(0).empty());

@@ -24,6 +24,12 @@ int main(int, char **argv) {
         status.state = State::running;
         if (::write(kStatusFd, &status, sizeof(status)) != sizeof(status))
             return 92;
+#ifdef UKE_TOUCH_GUI_REPORT_FAILURE
+        ::signal(SIGTERM, SIG_IGN);
+        ::close(kStatusFd);
+        while (true)
+            ::pause();
+#endif
         pollfd owner{kOwnerFd, POLLIN | POLLHUP, 0};
         while (::poll(&owner, 1, 100) >= 0) {
             if (owner.revents)

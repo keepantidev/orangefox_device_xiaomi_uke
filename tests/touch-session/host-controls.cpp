@@ -398,7 +398,26 @@ void controls(const std::string &root) {
     graphics_ready(true, true);
     resources_ready(true);
     start_once_after_frame(true);
-#ifdef UKE_TOUCH_GUI_HOST_CONTROLS
+#if defined(UKE_TOUCH_GUI_REPORT_FAILURE)
+    const auto gui_deadline = now_ms() + kGraceMs + 4000;
+    bool reaped = false;
+    while (now_ms() < gui_deadline) {
+        poll_status();
+        siginfo_t status{};
+        const auto child = ::waitid(P_ALL, 0, &status, WEXITED | WNOHANG | WNOWAIT);
+        if (child < 0 && errno == ECHILD) {
+            reaped = true;
+            break;
+        }
+        ::poll(nullptr, 0, 10);
+    }
+    check(reaped, "lost status channel triggers bounded cleanup without GUI shutdown");
+    check(collected_status().state == State::failed &&
+          collected_status().code == Code::child_exited, "lost status channel cannot stay running");
+    start_once_after_frame(true);
+    stop();
+    check(collected_status().state == State::failed, "teardown preserves status channel failure");
+#elif defined(UKE_TOUCH_GUI_HOST_CONTROLS)
     const auto gui_deadline = now_ms() + 2000;
     while (collected_status().state == State::preparing && now_ms() < gui_deadline) {
         poll_status();

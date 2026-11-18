@@ -117,7 +117,7 @@ public:
     string Current_File_System="ext4", Fstab_File_System="ext4";
     string Actual_Block_Device="fixture-only", Mount_Point="fixture-only", Mount_Options="nosuid,nodev";
     string Symlink_Mount_Point, Symlink_Path;
-    bool Mount(bool Display_Error);
+    bool Mount(bool Display_Error, const ure::LegacyLifecycleGuard* parent=nullptr);
     void Change_Mount_Read_Only(bool);
     bool Is_Mounted() { ++GateProbe::probes; return GateProbe::mounted; }
     void Find_Actual_Block_Device() { ++GateProbe::probes; }

@@ -90,6 +90,16 @@ void mounts(const string& original) {
     require(GateProbe::probes==0 && GateProbe::mounts.empty() && GateProbe::commands.empty(),"Writable mount looked up or opened storage");
     unchanged(original);
     partition.Mount_Read_Only=true;
+    {
+        GateProbe::reset();
+        ure::LegacyLifecycleGuard parent("mount");
+        require(parent.active(),"Parent mount lifecycle was refused");
+        require(!partition.Mount(false),"Nested mount acquired a second exclusive lifecycle");
+        require(GateProbe::mounts.empty(),"Unowned nested mount reached the mount callback");
+        require(partition.Mount(false,&parent),"Nested mount did not borrow its parent lifecycle");
+        require(!GateProbe::mounts.empty(),"Borrowed mount never reached the mount callback");
+        unchanged(original);
+    }
     for (const string fs : {"ext2","ext3","ext4","f2fs","vfat","erofs","squashfs"}) {
         GateProbe::reset(); partition.Current_File_System=partition.Fstab_File_System=fs;
         GateProbe::mount_results={-1,0};

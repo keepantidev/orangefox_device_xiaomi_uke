@@ -29,4 +29,14 @@ clang="$component/src/upstream/orangefox-android16/prebuilts/clang/host/linux-x8
     "$source_dir/touch-gui-session.cpp" -lcrypto -pthread -o "$work/controls-sanitized"
 ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
     timeout 45 "$work/controls-sanitized" "$work/host-check"
+"$compiler" -std=c++20 -O0 -Wall -Wextra -Werror -I "$source_dir" \
+    -DUKE_TOUCH_GUI_REPORT_FAILURE "$component/tests/touch-session/host-child.cpp" \
+    -o "$work/host-check/fixture-manager"
+"$clang" -std=c++20 -O0 -g -Wall -Wextra -Werror -I "$source_dir" \
+    -fsanitize=address,undefined -fno-sanitize=vptr -fno-omit-frame-pointer \
+    -DUKE_TOUCH_GUI_HOST_CONTROLS -DUKE_TOUCH_GUI_REPORT_FAILURE \
+    "$component/tests/touch-session/host-controls.cpp" "$source_dir/touch-gui-session.cpp" \
+    -lcrypto -pthread -o "$work/controls-report-failure"
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+    timeout 45 "$work/controls-report-failure" "$work/host-check"
 printf 'Touch session host and sanitizer controls passed; no OEM or device operation.\n'

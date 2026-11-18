@@ -563,14 +563,12 @@ void require_init_namespace() {
                 own.st_ino == init.st_ino && own.st_dev == init.st_dev,
             Code::namespace_failed);
 }
-void prepare_input_modules(std::uint64_t deadline, const std::string &suffix) {
+void prepare_input_modules(std::uint64_t deadline, const Mapping &odm, const Mapping &dlkm) {
     utsname kernel{};
     require(::uname(&kernel) == 0 && std::string_view(kernel.release) == kKernelRelease,
             Code::image_provider_unapproved);
     require_init_namespace();
     // Firmware lookup runs in init's namespace, not in the HAL sandbox.
-    auto odm = mapping("odm" + suffix);
-    auto dlkm = mapping("vendor_dlkm" + suffix);
     provider_mount("/odm", odm);
     provider_mount("/vendor_dlkm", dlkm);
     for (const auto &pin : kInstalledFiles)
@@ -863,18 +861,17 @@ int run() {
     require_init_namespace();
     const auto initial = mount_policy(current_mounts(), false, false, MountPhase::init_preparation);
     require(initial == Code::ok, initial);
-    prepare_input_modules(deadline, suffix);
-    private_namespace();
-    require(mount_policy(current_mounts(), false, false) == Code::ok, Code::mount_invalid);
     const auto mapping_deadline = std::min(deadline, now_ms() + kMappingMs);
-    std::optional<Mapping> odm, vendor;
-    while (!odm || !vendor) {
+    std::optional<Mapping> odm, vendor, dlkm;
+    while (!odm || !vendor || !dlkm) {
         preparing_check(deadline);
         try {
             if (!odm)
                 odm = mapping("odm" + suffix);
             if (!vendor)
                 vendor = mapping("vendor" + suffix);
+            if (!dlkm)
+                dlkm = mapping("vendor_dlkm" + suffix);
         } catch (Code code) {
             if (code != Code::mapping_missing)
                 throw;
@@ -883,6 +880,9 @@ int run() {
             ::poll(&owner, 1, 50);
         }
     }
+    prepare_input_modules(deadline, *odm, *dlkm);
+    private_namespace();
+    require(mount_policy(current_mounts(), false, false) == Code::ok, Code::mount_invalid);
     provider_mount("/odm", *odm);
     provider_mount("/vendor", *vendor);
     pmsg();

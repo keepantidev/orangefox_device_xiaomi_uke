@@ -201,12 +201,17 @@ struct Session {
             if (n == 0) {
                 if (used)
                     fail(Code::status_invalid);
+                else if (!stopping && (status.state == State::preparing ||
+                                       status.state == State::running))
+                    fail(Code::child_exited);
+                close_fd(owner);
                 close_fd(report);
                 break;
             }
             if (n < 0) {
                 if (errno != EAGAIN && errno != EINTR) {
                     fail(Code::io_failed);
+                    close_fd(owner);
                     close_fd(report);
                 }
                 break;
@@ -256,6 +261,11 @@ void poll_status() noexcept {
     if (session.pid > 1 && session.status.state == State::preparing &&
         milliseconds() - session.started > kStartupMs + 1000) {
         session.fail(Code::startup_timeout);
+        close_fd(session.owner);
+    }
+    if (session.pid > 1 && session.stop_stage == 0 &&
+        (session.owner < 0 || session.status.state == State::failed ||
+         session.status.state == State::refused || session.status.state == State::stopped)) {
         close_fd(session.owner);
         session.stop_requested = milliseconds();
         session.stop_stage = 1;

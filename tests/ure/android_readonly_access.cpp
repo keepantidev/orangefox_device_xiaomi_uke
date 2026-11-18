@@ -101,20 +101,24 @@ extern "C" int __wrap_ioctl(int fd,unsigned long request,...) {
 using userid_t=unsigned;
 #include "verify-policy.inc"
 #include "prepare-user-storage.inc"
+namespace ure { struct LegacyLifecycleGuard {}; }
 namespace ure::readonly_fstab {
 static bool mounted_readonly(const char*,const std::string&) { return ro; }
 }
 struct Partition {
     bool Mount_Read_Only=true, mountable=true;
     std::string Actual_Block_Device="/dev/block/fixture";
-    bool Mount(bool) { ++mounts; return mountable; }
+    const ure::LegacyLifecycleGuard* observed_parent=nullptr;
+    bool Mount(bool,const ure::LegacyLifecycleGuard* parent=nullptr) {
+        observed_parent=parent; ++mounts; return mountable;
+    }
 };
 class TWPartitionManager {
 public:
     Partition data, metadata;
     bool present=true;
     Partition* Find_Partition_By_Path(const std::string& path) { return present ? (path=="/data" ? &data : &metadata) : nullptr; }
-    bool Read_Only_Android_Access(bool require_data);
+    bool Read_Only_Android_Access(bool require_data,const ure::LegacyLifecycleGuard* parent=nullptr);
 };
 static bool additional_fstab_readonly_approved=true;
 #include "android-access.inc"
@@ -160,6 +164,9 @@ int main() {
     assert(!fscrypt_prepare_user_storage("",1,3)); assert(!fscrypt_prepare_user_storage("",0,0));
     ro=false; assert(!fscrypt_prepare_user_storage("",0,3)); ro=true;
     TWPartitionManager manager; assert(manager.Read_Only_Android_Access(true));
+    ure::LegacyLifecycleGuard parent;
+    assert(manager.Read_Only_Android_Access(true,&parent));
+    assert(manager.metadata.observed_parent==&parent && manager.data.observed_parent==&parent);
     const auto before=mounts; additional_fstab_readonly_approved=false;
     assert(!manager.Read_Only_Android_Access(true) && mounts==before); additional_fstab_readonly_approved=true;
     manager.present=false; assert(!manager.Read_Only_Android_Access(false)); manager.present=true;

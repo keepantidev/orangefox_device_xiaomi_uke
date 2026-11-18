@@ -1,0 +1,55 @@
+name: Recovery source and host validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out project
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install host test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap ccache g++ jq libssl-dev ripgrep dbus-user-session
+      - name: Report image-build resource prerequisites
+        run: |
+          {
+            printf '## Hosted runner capacity\n\n'
+            printf 'These measurements do not establish Android build or tablet acceptance.\n\n```text\n'
+            free -m
+            df -BG --output=size,avail,fstype .
+            printf '\nCPU count: '
+            nproc
+            printf '\nCgroup filesystem: '
+            stat -fc %T /sys/fs/cgroup
+            printf '\n```\n'
+            printf 'Firmware acquisition requires an 80 GiB free-space reserve after download, before accounting for the Android source and output trees.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Start isolated user service manager
+        run: |
+          sudo loginctl enable-linger "$(id -un)"
+          sudo systemctl start "user@$(id -u).service"
+          printf 'XDG_RUNTIME_DIR=/run/user/%s\n' "$(id -u)" >> "$GITHUB_ENV"
+          printf 'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%s/bus\n' "$(id -u)" >> "$GITHUB_ENV"
+      - name: Prepare pinned test sources
+        run: bash scripts/ci-recovery-validation.sh prepare
+      - name: Exercise touch subprocess ownership
+        run: bash scripts/with-host-budget.sh native bash tests/check-touch-session.sh
+      - name: Exercise read-only Android storage boundaries
+        run: bash tests/check-android-readonly-access.sh
+      - name: Record validation scope
+        if: always()
+        run: |
+          printf '\n## Scope\n\nThis workflow checks pinned patch stacks and host fixtures. It does not produce recovery.img, unlock Android storage, load OEM touch modules, or authorize tablet writes. See individual step results for failures.\n' >> "$GITHUB_STEP_SUMMARY"
