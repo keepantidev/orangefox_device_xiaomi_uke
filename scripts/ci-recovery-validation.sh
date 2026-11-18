@@ -24,6 +24,7 @@ for kind in recovery vold; do
     bash "$component/scripts/prepare-reviewed-patches.sh" "$path" apply "$kind"
     bash "$component/scripts/prepare-reviewed-patches.sh" "$path" check "$kind"
 done
+fetch bionic https://gitlab.com/OrangeFox/bionic.git 33fcbd9974be3b3b2899a484f8c0cb8dfa2d5e82
 fetch external/sqlite https://gitlab.com/OrangeFox/external/sqlite.git 28e3f5878182658a5c34d3ce0859e950f2885aba
 fetch prebuilts/clang/host/linux-x86 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 2d4dcbff7cb42f360f368bacf51cfe711fd1cb0f
 compiler="$tree/prebuilts/clang/host/linux-x86/clang-r547379/bin/clang++"

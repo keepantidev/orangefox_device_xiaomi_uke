@@ -13,6 +13,10 @@ compiler="$tree/prebuilts/clang/host/linux-x86/clang-r547379/bin/clang++"
 bash "$component/scripts/prepare-reviewed-patches.sh" "$vold" check vold
 bash "$component/scripts/prepare-recovery-patches.sh" "$recovery" check
 work=$(mktemp -d "$component/build/android-readonly-access-XXXXXXXX")
+[[ $(git -C "$tree/bionic" rev-parse HEAD) == 33fcbd9974be3b3b2899a484f8c0cb8dfa2d5e82 ]]
+mkdir "$work/linux"
+# Match the Android UAPI without depending on the host distribution's kernel headers.
+git -C "$tree/bionic" show HEAD:libc/kernel/uapi/linux/fscrypt.h > "$work/linux/fscrypt.h"
 extract() { awk -v prefix="$2" 'index($0,prefix)==1 {copy=1} copy {print} copy && /^}/ {exit}' "$1" > "$3"; [[ -s $3 ]]; }
 extract "$vold/MetadataCrypt.cpp" 'static bool mount_via_fs_mgr(' "$work/mount-metadata.inc"
 extract "$vold/MetadataCrypt.cpp" 'static bool read_key(' "$work/read-metadata-key.inc"
